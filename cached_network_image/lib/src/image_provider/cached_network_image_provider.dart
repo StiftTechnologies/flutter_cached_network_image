@@ -28,7 +28,7 @@ class CachedNetworkImageProvider
     this.headers,
     this.cacheManager,
     this.cacheKey,
-    this.imageRenderMethodForWeb = ImageRenderMethodForWeb.HtmlImage,
+    this.imageRenderMethodForWeb = ImageRenderMethodForWeb.HttpGet,
   });
 
   /// CacheManager from which the image files are loaded.

@@ -13,6 +13,8 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import 'src/create_image_codec_from_url_stub.dart'
     if (dart.library.ui_web) 'src/create_image_codec_from_url_web.dart';
+import 'src/decode_with_image_bitmap_stub.dart'
+    if (dart.library.ui_web) 'src/decode_with_image_bitmap_web.dart';
 
 enum _State { open, waitingForData, closing }
 
@@ -36,10 +38,7 @@ class ImageLoader implements platform.ImageLoader {
       url,
       cacheKey,
       chunkEvents,
-      (bytes) async {
-        final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
-        return decode(buffer);
-      },
+      (bytes) => _decodeBytes(bytes, (buffer) => decode(buffer)),
       cacheManager,
       maxHeight,
       maxWidth,
@@ -66,10 +65,7 @@ class ImageLoader implements platform.ImageLoader {
       url,
       cacheKey,
       chunkEvents,
-      (bytes) async {
-        final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
-        return decode(buffer);
-      },
+      (bytes) => _decodeBytes(bytes, (buffer) => decode(buffer)),
       cacheManager,
       maxHeight,
       maxWidth,
@@ -205,3 +201,14 @@ class ImageLoader implements platform.ImageLoader {
 }
 
 typedef _FileDecoderCallback = Future<ui.Codec> Function(Uint8List);
+
+Future<ui.Codec> _decodeBytes(
+  Uint8List bytes,
+  Future<ui.Codec> Function(ui.ImmutableBuffer) decodeWithEngine,
+) async {
+  final codec = await decodeWithImageBitmap(bytes);
+  if (codec != null) {
+    return codec;
+  }
+  return decodeWithEngine(await ui.ImmutableBuffer.fromUint8List(bytes));
+}
