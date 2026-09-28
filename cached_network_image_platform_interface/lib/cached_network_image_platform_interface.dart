@@ -1,5 +1,5 @@
 /// Platform interface for CachedNetworkImage
-library cached_network_image_platform_interface;
+library;
 
 import 'dart:async';
 import 'dart:ui' as ui;
@@ -14,7 +14,6 @@ typedef ErrorListener = void Function(Object);
 enum ImageRenderMethodForWeb {
   /// HtmlImage uses a default web image including default browser caching.
   HtmlImage, // ignore: constant_identifier_names
-
   /// HttpGet uses an http client to fetch an image. It enables the use of
   /// headers, but loses some default web functionality.
   /// This is the default choice.
