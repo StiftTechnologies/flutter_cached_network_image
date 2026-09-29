@@ -11,10 +11,16 @@ bool isStaticBitmapImage(Uint8List bytes) {
   if (_startsWith(bytes, const [0x42, 0x4D])) {
     return true;
   }
-  if (_startsWith(
-    bytes,
-    const [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
-  )) {
+  if (_startsWith(bytes, const [
+    0x89,
+    0x50,
+    0x4E,
+    0x47,
+    0x0D,
+    0x0A,
+    0x1A,
+    0x0A,
+  ])) {
     return !_isAnimatedPng(bytes);
   }
   if (_startsWith(bytes, const [0x52, 0x49, 0x46, 0x46]) &&
@@ -34,7 +40,8 @@ bool _isAnimatedPng(Uint8List bytes) {
     if (_matchesAt(bytes, offset + 4, const [0x49, 0x44, 0x41, 0x54])) {
       return false;
     }
-    final length = (bytes[offset] << 24) |
+    final length =
+        (bytes[offset] << 24) |
         (bytes[offset + 1] << 16) |
         (bytes[offset + 2] << 8) |
         bytes[offset + 3];
