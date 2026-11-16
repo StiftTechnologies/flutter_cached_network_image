@@ -1,3 +1,13 @@
+## [4.0.7] - 2026-11-10
+
+* Bump `flutter_cache_manager` to `^3.5.0`
+
+## [4.0.6] - 2026-10-29
+
+* Animated images no longer leak decoded frames or codecs when removed, including when released from the image cache
+* A newer refreshed image is no longer replaced by an older pending refresh
+* Refreshed images appear after playback finishes or resumes, without cutting a displayed animation frame short
+
 ## [4.0.5] - 2026-10-17
 
 * Stop decoding a static image again each time a listener is re-added, which blanked images on web (Firefox and Safari) after navigating back to a route
