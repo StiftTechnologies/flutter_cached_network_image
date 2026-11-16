@@ -17,8 +17,6 @@ import 'src/create_image_codec_from_url_stub.dart'
 import 'src/decode_with_image_bitmap_stub.dart'
     if (dart.library.ui_web) 'src/decode_with_image_bitmap_web.dart';
 
-enum _State { open, waitingForData, closing }
-
 /// ImageLoader class to load images on the web platform.
 class ImageLoader implements platform.ImageLoader {
   @Deprecated('Use loadImageAsync instead')
@@ -117,7 +115,74 @@ class ImageLoader implements platform.ImageLoader {
     Map<String, String>? headers,
     VoidCallback evictImage,
   ) {
-    var streamController = StreamController<ui.Codec>();
+    final streamController = StreamController<ui.Codec>();
+
+    var downloadDone = false;
+    var pendingDecodes = 0;
+    var finished = false;
+    var settling = false;
+    var decoded = false;
+    (Object, StackTrace)? decodeFailure;
+    (Object, StackTrace)? downloadFailure;
+
+    void finish() {
+      if (finished) return;
+      finished = true;
+      streamController.close();
+      chunkEvents.close();
+    }
+
+    void fail(Object e, StackTrace st) {
+      if (finished) return;
+      scheduleMicrotask(() {
+        evictImage();
+      });
+      streamController.addError(e, st);
+      finish();
+    }
+
+    // Runs once the download is over and every decode has finished, so a
+    // stale file that fails to decode is only fatal when no fresh file came.
+    Future<void> settle() async {
+      final failure = downloadFailure ?? (decoded ? null : decodeFailure);
+      if (decodeFailure != null && !decoded) {
+        try {
+          // Drop the broken entry so the next attempt downloads it again.
+          await cacheManager.removeFile(cacheKey ?? url);
+        } on Object catch (_) {
+          // Keep the original error visible.
+        }
+      }
+      if (failure == null) {
+        finish();
+      } else {
+        fail(failure.$1, failure.$2);
+      }
+    }
+
+    void closeIfComplete() {
+      if (settling || !downloadDone || pendingDecodes > 0) return;
+      settling = true;
+      unawaited(settle());
+    }
+
+    Future<void> decodeFile(FileInfo info) async {
+      try {
+        final bytes = await info.file.readAsBytes();
+        final codec = await decode(bytes);
+        if (finished) {
+          codec.dispose();
+        } else {
+          decoded = true;
+          streamController.add(codec);
+        }
+      } on Object catch (e, st) {
+        decodeFailure = (e, st);
+      } finally {
+        pendingDecodes--;
+        closeIfComplete();
+      }
+    }
 
     try {
       final stream = cacheManager.getFileStream(
@@ -126,8 +191,6 @@ class ImageLoader implements platform.ImageLoader {
         headers: headers,
         key: cacheKey,
       );
-
-      var state = _State.open;
 
       stream.listen(
         (event) {
@@ -140,42 +203,23 @@ class ImageLoader implements platform.ImageLoader {
             );
           }
           if (event is FileInfo) {
-            if (state == _State.open) {
-              state = _State.waitingForData;
-            }
-
-            event.file.readAsBytes().then((value) => decode(value)).then((
-              data,
-            ) {
-              streamController.add(data);
-              if (state == _State.closing) {
-                streamController.close();
-                chunkEvents.close();
-              }
-            });
+            pendingDecodes++;
+            unawaited(decodeFile(event));
           }
         },
-        onError: (e, st) {
-          scheduleMicrotask(() {
-            evictImage();
-          });
-          streamController.addError(e, st);
+        onError: (Object e, StackTrace st) {
+          downloadFailure = (e, st);
+          downloadDone = true;
+          closeIfComplete();
         },
-        onDone: () async {
-          if (state == _State.open) {
-            streamController.close();
-            chunkEvents.close();
-          } else if (state == _State.waitingForData) {
-            state = _State.closing;
-          }
+        onDone: () {
+          downloadDone = true;
+          closeIfComplete();
         },
         cancelOnError: true,
       );
     } on Object catch (e, st) {
-      scheduleMicrotask(() {
-        evictImage();
-      });
-      streamController.addError(e, st);
+      fail(e, st);
     }
 
     return streamController.stream;
